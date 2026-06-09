@@ -27,7 +27,7 @@ app.post("/analyze", async (req, res) => {
     const prompt = `
 You are an AI career analyst.
 
-Analyze the candidate below and respond STRICTLY in JSON.
+Analyze the candidate below and respond STRICTLY in JSON only.
 
 Name: ${name}
 Experience: ${experience}
@@ -41,16 +41,16 @@ Return JSON ONLY in this format:
 `;
 
     const response = await openai.chat.completions.create({
-      model: "llama3-70b-8192", // ✅ FIXED MODEL (working)
+      model: "llama-3.1-8b-instant", // ✅ LATEST WORKING MODEL
       messages: [{ role: "user", content: prompt }],
       temperature: 0.7
     });
 
     const text = response.choices[0].message.content;
 
-    console.log("AI RAW RESPONSE:", text);
+    console.log("✅ AI RAW RESPONSE:", text);
 
-    // ✅ SAFE JSON EXTRACTION
+    // ✅ SAFE JSON EXTRACTION (CRUCIAL)
     const jsonMatch = text.match(/\{[\s\S]*\}/);
 
     if (!jsonMatch) {
@@ -59,17 +59,18 @@ Return JSON ONLY in this format:
 
     const parsed = JSON.parse(jsonMatch[0]);
 
+    // ✅ Response to frontend
     res.json({
       name,
       ...parsed
     });
 
   } catch (error) {
-    console.error("FULL ERROR:", error);
+    console.error("❌ FULL ERROR:", error);
 
     res.status(500).json({
       error: "AI processing failed",
-      details: error.message // ✅ helps debugging
+      details: error.message
     });
   }
 });
@@ -80,3 +81,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
+``
