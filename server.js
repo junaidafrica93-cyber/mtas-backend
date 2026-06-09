@@ -14,12 +14,12 @@ const openai = new OpenAI({
   baseURL: "https://api.groq.com/openai/v1"
 });
 
-// ✅ TEST ROUTE
+// ✅ Health check route
 app.get("/", (req, res) => {
   res.send("Backend running ✅");
 });
 
-// ✅ AI ANALYSIS ROUTE (REAL AI)
+// ✅ AI ANALYSIS ROUTE
 app.post("/analyze", async (req, res) => {
   try {
     const { name, experience } = req.body;
@@ -27,7 +27,7 @@ app.post("/analyze", async (req, res) => {
     const prompt = `
 You are an AI career analyst.
 
-Analyze the candidate below and respond STRICTLY in JSON only.
+Analyze the candidate below and respond STRICTLY in JSON.
 
 Name: ${name}
 Experience: ${experience}
@@ -41,14 +41,18 @@ Return JSON ONLY in this format:
 `;
 
     const response = await openai.chat.completions.create({
-      model: "llama3-8b-8192", // ✅ FREE + FAST
-      messages: [{ role: "user", content: prompt }]
+      model: "llama3-70b-8192", // ✅ FIXED MODEL (working)
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7
     });
 
     const text = response.choices[0].message.content;
 
-    // ✅ SAFE JSON PARSING (IMPORTANT)
+    console.log("AI RAW RESPONSE:", text);
+
+    // ✅ SAFE JSON EXTRACTION
     const jsonMatch = text.match(/\{[\s\S]*\}/);
+
     if (!jsonMatch) {
       throw new Error("Invalid AI response format");
     }
@@ -61,8 +65,12 @@ Return JSON ONLY in this format:
     });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "AI processing failed" });
+    console.error("FULL ERROR:", error);
+
+    res.status(500).json({
+      error: "AI processing failed",
+      details: error.message // ✅ helps debugging
+    });
   }
 });
 
