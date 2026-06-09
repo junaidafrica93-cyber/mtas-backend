@@ -8,17 +8,18 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ✅ OpenAI setup
+// ✅ GROQ CONFIG (FREE AI)
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.GROQ_API_KEY,
+  baseURL: "https://api.groq.com/openai/v1"
 });
 
-// ✅ Test route
+// ✅ TEST ROUTE
 app.get("/", (req, res) => {
   res.send("Backend running ✅");
 });
 
-// ✅ AI Analyze Route
+// ✅ AI ANALYSIS ROUTE (REAL AI)
 app.post("/analyze", async (req, res) => {
   try {
     const { name, experience } = req.body;
@@ -40,15 +41,17 @@ Return JSON ONLY in this format:
 `;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "llama3-8b-8192", // ✅ FREE + FAST
       messages: [{ role: "user", content: prompt }]
     });
 
     const text = response.choices[0].message.content;
 
-    // ✅ Safe JSON extraction
+    // ✅ SAFE JSON PARSING (IMPORTANT)
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("Invalid AI response");
+    if (!jsonMatch) {
+      throw new Error("Invalid AI response format");
+    }
 
     const parsed = JSON.parse(jsonMatch[0]);
 
@@ -63,7 +66,7 @@ Return JSON ONLY in this format:
   }
 });
 
-// ✅ Start server
+// ✅ START SERVER
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
