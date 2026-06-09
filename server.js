@@ -1,49 +1,43 @@
-const express = require("express");
-const cors = require("cors");
+app.post("/analyze", async (req, res) => {
+  try {
+    const { name, experience } = req.body;
 
-const app = express();
+    const prompt = `
+You are an AI career analyst.
 
-// ✅ middleware
-app.use(cors());
-app.use(express.json());
+Analyze the candidate below and respond STRICTLY in JSON only.
 
-// ✅ test route
-app.get("/", (req, res) => {
-  res.send("Backend running ✅");
-});
+Name: ${name}
+Experience: ${experience}
 
-// ✅ analyze route
-app.post("/analyze", (req, res) => {
-  const { name, experience } = req.body;
+Return JSON ONLY in this format:
+{
+  "experience_level": "Junior | Mid-Level | Senior",
+  "skills": ["skill1", "skill2", "skill3"],
+  "recommended_roles": ["role1", "role2", "role3"]
+}
+`;
 
-  let skills = [];
-  let roles = [];
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }]
+    });
 
-  if (experience.toLowerCase().includes("recruit")) {
-    skills.push("Talent Acquisition", "Stakeholder Management");
-    roles.push("Talent Partner", "Recruitment Manager");
+    const text = response.choices[0].message.content;
+
+    // ✅ SAFE PARSE
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("Invalid AI response");
+
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    res.json({
+      name,
+      ...parsed
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "AI processing failed" });
   }
-
-  if (experience.toLowerCase().includes("hr")) {
-    skills.push("HR Management", "Employee Relations");
-    roles.push("HR Manager", "HR Business Partner");
-  }
-
-  if (skills.length === 0) {
-    skills.push("Communication", "Problem Solving");
-    roles.push("General Associate");
-  }
-
-  res.json({
-    name,
-    experience_level: "Mid-Level",
-    skills,
-    recommended_roles: roles
-  });
-});
-
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
 });
