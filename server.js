@@ -1,3 +1,24 @@
+const express = require("express");
+const cors = require("cors");
+const OpenAI = require("openai");
+
+const app = express();
+
+// ✅ Middleware
+app.use(cors());
+app.use(express.json());
+
+// ✅ OpenAI setup
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+// ✅ Test route
+app.get("/", (req, res) => {
+  res.send("Backend running ✅");
+});
+
+// ✅ AI Analyze Route
 app.post("/analyze", async (req, res) => {
   try {
     const { name, experience } = req.body;
@@ -25,7 +46,7 @@ Return JSON ONLY in this format:
 
     const text = response.choices[0].message.content;
 
-    // ✅ SAFE PARSE
+    // ✅ Safe JSON extraction
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("Invalid AI response");
 
@@ -40,4 +61,11 @@ Return JSON ONLY in this format:
     console.error(error);
     res.status(500).json({ error: "AI processing failed" });
   }
+});
+
+// ✅ Start server
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
 });
