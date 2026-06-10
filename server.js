@@ -1,90 +1,235 @@
-const express = require("express");
-const cors = require("cors");
-const OpenAI = require("openai");
+const API_URL = "https://mtas-backend.onrender.com";
 
-const app = express();
+// ✅ MAIN ANALYZE BUTTON
+async function analyzeCV() {
+  const name = document.getElementById("name").value;
+  const experience = document.getElementById("experience").value;
 
-// ✅ Middleware
-app.use(cors());
-app.use(express.json());
+  // Show loading
+  document.getElementById("results").innerHTML = "⚡ Analyzing...";
 
-// ✅ GROQ CONFIG
-const openai = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY,
-  baseURL: "https://api.groq.com/openai/v1"
-});
-
-// ✅ Health check
-app.get("/", (req, res) => {
-  res.send("Backend running ✅");
-});
-
-// ✅ AI ANALYSIS WITH SCORING
-app.post("/analyze", async (req, res) => {
   try {
-    const { name, experience } = req.body;
-
-    const prompt = `
-You are an AI recruiter assistant.
-
-Analyze the candidate below and return structured JSON.
-
-Name: ${name}
-Experience: ${experience}
-
-IMPORTANT:
-- Score must be from 0 to 100
-- Be realistic and consistent
-- Provide concise results
-
-Return ONLY JSON in this format:
-{
-  "experience_level": "Junior | Mid-Level | Senior",
-  "score": 0,
-  "skills": ["skill1", "skill2", "skill3"],
-  "strengths": ["strength1", "strength2"],
-  "gaps": ["gap1", "gap2"],
-  "recommended_roles": ["role1", "role2", "role3"]
-}
-`;
-
-    const response = await openai.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7
+    const res = await fetch(`${API_URL}/analyze`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ name, experience })
     });
 
-    const text = response.choices[0].message.content;
+    const data = await res.json();
 
-    console.log("✅ AI RAW:", text);
+    displayResults(data);
 
-    // ✅ Extract valid JSON
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("Invalid AI response format");
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]);
-
-    // ✅ Return FULL structured response
-    res.json({
-      name,
-      ...parsed
-    });
-
-  } catch (error) {
-    console.error("❌ ERROR:", error);
-
-    res.status(500).json({
-      error: "AI processing failed",
-      details: error.message
-    });
+  } catch (err) {
+    console.error(err);
+    document.getElementById("results").innerHTML =
+      "❌ Error connecting to AI";
   }
-});
+}
 
-// ✅ Start server
-const PORT = process.env.PORT || 3000;
+// ✅ DISPLAY MAIN RESULTS
+function displayResults(data) {
+  const rolesHTML = data.roles.map(role => `
+    <div class="job-card">
+      <h4>${role.title}</h4>
+      <p>Match: ${role.match}% ✅</p>
+      <button onclick="selectRole('${role.title}')">
+        View Details
+      </button>
+    </div>
+  `).join("");
 
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
-});
+  document.getElementById("results").innerHTML = `
+    <h2>🚀 JOBMETRIX Results</h2>
+
+    <p><strong>Name:</strong> ${data.name}</p>
+    <p><strong>Experience Level:</strong> ${data.experience_level}</p>
+
+    <p><strong>Score:</strong> ${data.score}/100</p>
+
+    <h3>Skills</h3>
+    <ul>
+      ${data.skills.map(s => `<li>${s}</li>`).join("")}
+    </ul>
+
+    <h3>Strengths</h3>
+    <ul>
+      ${data.strengths.map(s => `<li>${s}</li>`).join("")}
+    </ul>
+
+    <h3>Areas to Improve</h3>
+    <ul>
+      ${data.gaps.map(g => `<li>${g}</li>`).join("")}
+    </ul>
+
+    <h3>💼 Recommended Roles (≥70% Match)</h3>
+    ${rolesHTML}
+  `;
+}
+
+// ✅ USER SELECTS A ROLE
+async function selectRole(role) {
+  const experience = document.getElementById("experience").value;
+
+  document.getElementById("results").innerHTML = "🔍 Loading role details...";
+
+  try {
+    const res = await fetch(`${API_URL}/role-details`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ role, experience })
+    });
+
+    const data = await res.json();
+
+    document.getElementById("results").innerHTML = `
+      <h2>${role}</h2>
+
+      <p><strong>Role Summary:</strong></p>
+      <p>${data.role_summary}</p>
+
+      <p><strong>Match Score:</strong> ${data.match_percentage}%</p>
+
+      <p><strong>Missing Skills:</strong></p>
+      <ul>
+        ${data.missing_skills.map(s => `<li>${s}</li>`).join("")}
+      </ul>
+
+      <button onclick="startScreening('${role}')">
+        Start Screening
+      </button>
+    `;
+  } catch (err) {
+    console.error(err);
+    document.getElementById("results").innerHTML =
+      "❌ Error loading role details";
+  }
+}
+
+// ✅ START SCREENING QUESTIONS
+async function startScreening(role) {
+  document.getElementById("results").innerHTML = "🧠 Generating questions...";
+
+  try {
+    const res = await fetch(`${API_URL}/screening-questions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ role })
+    });
+
+    const data = await res.json();
+
+    const questionsHTML = data.questions.map((q, i) => `
+      <div>
+        <p>${q}</p>
+        <textarea id="answer${i}" placeholder="Your answer..."></textarea>
+      </div>
+    `).join("");
+
+    document.getElementById("results").innerHTML = `
+      <h2>Screening Questions</h2>
+      ${questionsHTML}
+
+      <button onclick="submitAnswers('${role}', ${data.questions.length})">
+        Submit Answers
+      </button>
+    `;
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById("results").innerHTML =
+      "❌ Error generating questions";
+  }
+}
+
+// ✅ SUBMIT SCREENING ANSWERS
+async function submitAnswers(role, count) {
+  let answers = [];
+
+  for (let i = 0; i < count; i++) {
+    const value = document.getElementById(`answer${i}`).value;
+    answers.push(value);
+  }
+
+  document.getElementById("results").innerHTML = "⚡ Evaluating...";
+
+  try {
+    const res = await fetch(`${API_URL}/evaluate-answers`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ role, answers })
+    });
+
+    const data = await res.json();
+
+    document.getElementById("results").innerHTML = `
+      <h2>Evaluation Result</h2>
+
+      <p><strong>Fit Score:</strong> ${data.fit_score}/100</p>
+      <p><strong>Decision:</strong> ${data.decision}</p>
+
+      <p><strong>Feedback:</strong></p>
+      <p>${data.feedback}</p>
+
+      <button onclick="generateCV()">
+        Generate Updated CV
+      </button>
+    `;
+  } catch (err) {
+    console.error(err);
+    document.getElementById("results").innerHTML =
+      "❌ Error evaluating answers";
+  }
+}
+
+// ✅ GENERATE ATS CV
+async function generateCV() {
+  const name = document.getElementById("name").value;
+  const experience = document.getElementById("experience").value;
+
+  document.getElementById("results").innerHTML = "📄 Generating CV...";
+
+  try {
+    const res = await fetch(`${API_URL}/generate-cv`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ name, experience })
+    });
+
+    const data = await res.json();
+
+    document.getElementById("results").innerHTML = `
+      <h2>Your ATS CV</h2>
+
+      <pre>${data.cv}</pre>
+
+      <button onclick="downloadCV(\`${data.cv}\`)">
+        Download CV
+      </button>
+    `;
+  } catch (err) {
+    console.error(err);
+    document.getElementById("results").innerHTML =
+      "❌ Error generating CV";
+  }
+}
+
+// ✅ DOWNLOAD CV
+function downloadCV(text) {
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = window.URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "Updated_CV.txt";
+  a.click();
+}
