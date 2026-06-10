@@ -1,11 +1,15 @@
 {
+  "name": "jobmetrix-backend",
+  "version": "1.0.0",
+  "description": "JobMetrix Backend API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
+  "author": "Junaid Africa",
+  "license": "ISC",
   "dependencies": {
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "openai": "^6.42.0"
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
   }
 }
